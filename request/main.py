@@ -1,3 +1,4 @@
-from mypackage import module1 as m1
+from bot import run_bot
 
-m1.search_gifs()
+
+run_bot()

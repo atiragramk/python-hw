@@ -1,14 +1,15 @@
 import requests
+import os
 
-BASE_GIFHY_URL = 'https://api.giphy.com/v1/gifs/'
+BASE_GIFHY_URL = os.environ.get('BASE_GIFHY_URL')
 
-API_KEY = 'URUUMcTVhjNpobK3ylLNDBzRw2J8uGkQ'
+API_KEY = os.environ.get('API_KEY')
 
 
-def search_gifs():
+def search_gifs(query: str, limit: int):
     try:
-        query = input('Enter a search word >>> ')
-        limit = int(input('How many gifs do you need? >>> '))
+        if not limit.isdigit():
+            raise ValueError
         response = requests.get(
             f'{BASE_GIFHY_URL}search?api_key={API_KEY}&q={query}&limit={limit}&offset=0&rating=g&lang=en&bundle=messaging_non_clips')
         if response.status_code != 200:
@@ -16,7 +17,7 @@ def search_gifs():
         data = response.json()
         result_list = []
         for el in data['data']:
-            url = el['embed_url']
+            url = el['images']['original']['url']
             print(url)
             result_list.append(url)
         return result_list
