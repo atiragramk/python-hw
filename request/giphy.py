@@ -7,11 +7,19 @@ API_KEY = os.environ.get('API_KEY')
 
 
 def search_gifs(query: str, limit: int):
+    params = {
+        "q": query,
+        "limit": limit,
+        "offset": 0,
+        'rating': 'g',
+        "lang": 'en',
+        'bundle': 'messaging_non_clips'
+    }
     try:
         if not limit.isdigit():
             raise ValueError
         response = requests.get(
-            f'{BASE_GIFHY_URL}search?api_key={API_KEY}&q={query}&limit={limit}&offset=0&rating=g&lang=en&bundle=messaging_non_clips')
+            f'{BASE_GIFHY_URL}search?api_key={API_KEY}', params=params)
         if response.status_code != 200:
             response.raise_for_status()
         data = response.json()
