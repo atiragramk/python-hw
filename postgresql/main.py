@@ -15,12 +15,13 @@ def main():
     psycopg2.extras.register_uuid()
     conn = psycopg2.connect(
         f"dbname={os.getenv('DB_NAME')} user={os.getenv('USER')}")
-    cur = conn.cursor()
+    # cur = conn.cursor()
 
     # cur.execute("CREATE TYPE user_enum AS ENUM ('Host', 'Guest')")
     # cur.execute("CREATE TYPE payment_enum AS ENUM ('full', 'part')")
 
-    cur.execute("""
+    with conn.cursor() as cur:
+        cur.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                 id uuid PRIMARY KEY,
                 username varchar(50) NOT NULL,
@@ -28,8 +29,7 @@ def main():
                 user_type user_enum NOT NULL
                 )
                 """)
-
-    cur.execute("""
+        cur.execute("""
                 CREATE TABLE IF NOT EXISTS rooms (
                 id uuid PRIMARY KEY,
                 host_id uuid NOT NULL,
@@ -44,8 +44,7 @@ def main():
                     REFERENCES users (id)
                 )
                 """)
-
-    cur.execute("""
+        cur.execute("""
                 CREATE TABLE IF NOT EXISTS reservations (
                 id uuid PRIMARY KEY,
                 guest_id uuid NOT NULL,
@@ -62,8 +61,7 @@ def main():
                     REFERENCES rooms (id)
                 )
                 """)
-
-    cur.execute("""
+        cur.execute("""
                 CREATE TABLE IF NOT EXISTS payments (
                 id uuid PRIMARY KEY,
                 guest_id uuid NOT NULL,
@@ -78,8 +76,7 @@ def main():
                     REFERENCES reservations (id)
                 )
                 """)
-
-    cur.execute("""
+        cur.execute("""
                 CREATE TABLE IF NOT EXISTS reviews (
                 id uuid PRIMARY KEY,
                 guest_id uuid NOT NULL,
@@ -98,12 +95,13 @@ def main():
     def create_users():
         for i in range(3):
             name = random.choice(names)
-            cur.execute("""
+            with conn.cursor() as cur:
+                cur.execute("""
                         INSERT INTO users (id, username, email, user_type) 
                         VALUES (%s, %s, %s,%s)""",
-                        (uuid.uuid4(), name,
-                         f'{name}{i}@gmail.com', random.choice(user_type))
-                        )
+                            (uuid.uuid4(), name,
+                             f'{name}{i}@gmail.com', random.choice(user_type))
+                            )
     create_users()
 
     def create_rooms(host: str, type: str, price: int, capacity: int, availability: bool):
@@ -111,22 +109,23 @@ def main():
                  'https://a0.muscache.com/im/pictures/943b83b0-2abf-4dcf-ba7c-a6c2eb429dda.jpg?im_w=720']
         amenities = ['WiFi', 'Smart locks', 'Pet-friendly',
                      'A fully equipped kitchen', 'Hot tub', 'jacuzzi', 'Free parking']
-        cur.execute("""
-                    INSERT INTO rooms (
-                    id,
-                    host_id,
-                    room_type,
-                    price,
-                    capacity,
-                    availability,
-                    picture,
-                    amenities
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (uuid.uuid4(), host, type, price,
-                     capacity, availability, photo, amenities)
-                    )
-        conn.commit()
+        with conn.cursor() as cur:
+            cur.execute("""
+                        INSERT INTO rooms (
+                        id,
+                        host_id,
+                        room_type,
+                        price,
+                        capacity,
+                        availability,
+                        picture,
+                        amenities
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (uuid.uuid4(), host, type, price,
+                         capacity, availability, photo, amenities)
+                        )
+            conn.commit()
 
     create_rooms(host='f5f55628-3cc3-11ee-a93c-089798a4699f',
                  type='apartment', price=120, capacity=2, availability=True)
@@ -138,30 +137,32 @@ def main():
     def create_reservation(guest: str, room: str, date_in: str, date_out: str, status: str, number_guests: int):
         dt_in = datetime.strptime(date_in, "%Y/%m/%d")
         dt_out = datetime.strptime(date_out, "%Y/%m/%d")
-        cur.execute(f"""
-                    SELECT price 
-                    FROM rooms
-                    WHERE id='{room}'
-                    """)
-        delta = dt_out - dt_in
-        delta.days
-        price, = cur.fetchone()
+        with conn.cursor() as cur:
+            cur.execute(f"""
+                        SELECT price 
+                        FROM rooms
+                        WHERE id='{room}'
+                        """)
+            delta = dt_out - dt_in
+            delta.days
+            price, = cur.fetchone()
 
-        cur.execute("""
-                    INSERT INTO reservations (
-                    id,
-                    guest_id,
-                    room_id,
-                    check_in_date,
-                    check_out_date,
-                    payment_status,
-                    number_of_guests,
-                    total_price
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (uuid.uuid4(), guest, room, dt_in,
-                     dt_out, status, number_guests, price*delta.days)
-                    )
+            cur.execute("""
+                        INSERT INTO reservations (
+                        id,
+                        guest_id,
+                        room_id,
+                        check_in_date,
+                        check_out_date,
+                        payment_status,
+                        number_of_guests,
+                        total_price
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (uuid.uuid4(), guest, room, dt_in,
+                         dt_out, status, number_guests, price*delta.days)
+                        )
+            conn.commit()
 
     create_reservation(guest='94322ff9-3cc4-11ee-918c-089798a4699f',
                        room='09210b1f-ea33-464a-9e4d-077b13373ccd', date_in="2023/08/10", date_out="2023/08/16", status='pending', number_guests=2)
@@ -170,66 +171,68 @@ def main():
 
     def create_payment(reservation: str, payment_date: str, method: str):
         dt_payment = datetime.strptime(payment_date, "%Y/%m/%d")
-        cur.execute(f"""
-                    SELECT guest_id, total_price
-                    FROM reservations
-                    WHERE id='{reservation}'
-                    """)
-        guest_id, total_price = cur.fetchone()
-
-        try:
-            cur.execute("""
-                        INSERT INTO payments (
-                        id,
-                        guest_id,
-                        reservation_id,
-                        payment_amount,
-                        payment_date,
-                        payment_method
-                        ) VALUES (%s, %s, %s, %s, %s, %s)
-                        """,
-                        (uuid.uuid4(), guest_id, reservation,
-                            total_price, dt_payment, method)
-                        )
-            conn.commit()
+        with conn.cursor() as cur:
             cur.execute(f"""
-                        UPDATE reservations
-                        SET payment_status = 'success'
-                        WHERE id = '{reservation}'
-                        """
-                        )
-            conn.commit()
+                        SELECT guest_id, total_price
+                        FROM reservations
+                        WHERE id='{reservation}'
+                        """)
+            guest_id, total_price = cur.fetchone()
 
-        except psycopg2.errors:
-            print(psycopg2.errors)
+            try:
+                cur.execute("""
+                            INSERT INTO payments (
+                            id,
+                            guest_id,
+                            reservation_id,
+                            payment_amount,
+                            payment_date,
+                            payment_method
+                            ) VALUES (%s, %s, %s, %s, %s, %s)
+                            """,
+                            (uuid.uuid4(), guest_id, reservation,
+                                total_price, dt_payment, method)
+                            )
+                cur.execute(f"""
+                            UPDATE reservations
+                            SET payment_status = 'success'
+                            WHERE id = '{reservation}'
+                            """
+                            )
+                conn.commit()
+
+            except psycopg2.errors:
+                print(psycopg2.errors)
 
     def create_review(reservation: str, rating: int, review: str, date: int):
         dt_post = datetime.strptime(date, "%Y/%m/%d")
-        cur.execute(f"""
-                    SELECT guest_id, room_id
-                    FROM reservations
-                    WHERE id='{reservation}'
-                    AND payment_status = 'success'
-                    """)
-        guest_id, room_id = cur.fetchone()
+        with conn.cursor() as cur:
+            cur.execute(f"""
+                        SELECT guest_id, room_id
+                        FROM reservations
+                        WHERE id='{reservation}'
+                        AND payment_status = 'success'
+                        """)
+            guest_id, room_id = cur.fetchone()
 
-        try:
-            cur.execute("""
-                        INSERT INTO reviews (
-                        id,
-                        guest_id,
-                        room_id,
-                        rating,
-                        comment,
-                        date_posted
-                        ) VALUES (%s, %s, %s, %s, %s, %s)
-                        """,
-                        (uuid.uuid4(), guest_id, room_id, rating, review, dt_post)
-                        )
-            conn.commit()
+            try:
+                cur.execute("""
+                            INSERT INTO reviews (
+                            id,
+                            guest_id,
+                            room_id,
+                            rating,
+                            comment,
+                            date_posted
+                            ) VALUES (%s, %s, %s, %s, %s, %s)
+                            """,
+                            (uuid.uuid4(), guest_id, room_id,
+                             rating, review, dt_post)
+                            )
+                conn.commit()
 
-        except psycopg2.errors:
-            print(psycopg2.errors)
+            except psycopg2.errors:
+                print(psycopg2.errors)
 
     create_payment(reservation='184dbbe1-4efc-4781-a159-001698ed633a',
                    payment_date='2023/08/14', method='full')
@@ -246,44 +249,47 @@ def main():
                   review='Noisy neighbors', rating=4, date='2023/08/10')
 
     def get_user_biggest_amount_reservations():
-        cur.execute("""
-                    SELECT u.id, u.username, COUNT(r.id) AS num_reservations
-                    FROM users u
-                    JOIN reservations r ON u.id = r.guest_id
-                    GROUP BY u.id, u.username
-                    ORDER BY num_reservations DESC
-                    LIMIT 1;
-                    """)
-        id, username, amount_reservations = cur.fetchone()
-        return f'User ID: {id}, UserName: {username}'
+        with conn.cursor() as cur:
+            cur.execute("""
+                        SELECT u.id, u.username, COUNT(r.id) AS num_reservations
+                        FROM users u
+                        JOIN reservations r ON u.id = r.guest_id
+                        GROUP BY u.id, u.username
+                        ORDER BY num_reservations DESC
+                        LIMIT 1;
+                        """)
+            id, username, amount_reservations = cur.fetchone()
+            return f'User ID: {id}, UserName: {username}'
 
     def get_user_biggest_earning():
-        cur.execute("""
-                    SELECT u.id, u.username, SUM(p.payment_amount) AS earnings
-                    FROM users u
-                    JOIN rooms r ON u.id = r.host_id
-                    JOIN reservations res ON r.id = res.room_id
-                    JOIN payments p ON res.id = p.reservation_id
-                    WHERE EXTRACT(MONTH FROM p.payment_date) = EXTRACT (MONTH FROM CURRENT_DATE)
-                    AND EXTRACT(YEAR FROM p.payment_date) = EXTRACT(YEAR FROM CURRENT_DATE)
-                    GROUP BY u.id, u.username
-                    ORDER BY earnings DESC
-                    LIMIT 1;
-                    """)
-        id, username, earnings = cur.fetchone()
+        with conn.cursor() as cur:
+            cur.execute("""
+                        SELECT u.id, u.username, SUM(p.payment_amount) AS earnings
+                        FROM users u
+                        JOIN rooms r ON u.id = r.host_id
+                        JOIN reservations res ON r.id = res.room_id
+                        JOIN payments p ON res.id = p.reservation_id
+                        WHERE EXTRACT(MONTH FROM p.payment_date) = EXTRACT (MONTH FROM CURRENT_DATE)
+                        AND EXTRACT(YEAR FROM p.payment_date) = EXTRACT(YEAR FROM CURRENT_DATE)
+                        GROUP BY u.id, u.username
+                        ORDER BY earnings DESC
+                        LIMIT 1;
+                        """)
+            id, username, earnings = cur.fetchone()
         return f'User ID: {id}, UserName: {username}'
 
     def get_user_biggest_avg_rating():
-        cur.execute("""
-                    SELECT u.id, u.username, AVG(rev.rating) AS feedback
-                    FROM users u
-                    JOIN rooms r ON u.id = r.host_id
-                    JOIN reviews rev ON r.id = rev.room_id
-                    GROUP BY u.id, u.username
-                    ORDER BY feedback DESC
-                    LIMIT 1;
-                    """)
-        id, username, rating = cur.fetchone()
+        with conn.cursor() as cur:
+            cur.execute("""
+                        SELECT u.id, u.username, AVG(rev.rating) AS feedback
+                        FROM users u
+                        JOIN rooms r ON u.id = r.host_id
+                        JOIN reviews rev ON r.id = rev.room_id
+                        GROUP BY u.id, u.username
+                        ORDER BY feedback DESC
+                        LIMIT 1;
+                        """)
+            id, username, rating = cur.fetchone()
         return f'User ID: {id}, UserName: {username}'
 
     print(get_user_biggest_amount_reservations())
