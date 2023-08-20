@@ -5,7 +5,13 @@ import uuid
 import random
 from datetime import datetime
 import os
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, Integer, String
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
+
+DATABASE_URI = 'postgresql://{user}:{password}@{host}:{port}/{database}'
 
 names = ['Katlyn', 'Lorri', 'Elaine', 'John', 'Valerie', 'Terri']
 user_type = ['Host', 'Guest']
@@ -16,7 +22,21 @@ def main():
     conn = psycopg2.connect(
         f"dbname={os.getenv('DB_NAME')} user={os.getenv('USER')}")
     # cur = conn.cursor()
+    Base = declarative_base()
 
+    engine = create_engine(
+        DATABASE_URI.format(
+            host='localhost',
+            database=os.getenv('DB_NAME'),
+            user=os.getenv('USER'),
+            password=os.getenv('PASSWORD'),
+            port=5432,
+        )
+    )
+    # Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+
+    session = Session()
     # cur.execute("CREATE TYPE user_enum AS ENUM ('Host', 'Guest')")
     # cur.execute("CREATE TYPE payment_enum AS ENUM ('full', 'part')")
 
