@@ -104,13 +104,15 @@ class Bank:
         for account in self._accounts:
             if isinstance(account, CurrentAccount):
                 if account._balance < 0:
-                    return f"Sending letter for account {account._account_number}: Overdraft limit exceeded."
+                    print(
+                        f"Sending letter for account {account._account_number}: Overdraft limit exceeded.")
             if isinstance(account, SavingsAccount):
                 account.add_interest()
 
-    def open_account(self, account):
+    def open_account(self, account: Account):
         if not isinstance(account, Account):
-            return TypeError("The account is not the instance of needed classes")
+            raise TypeError(
+                "The account is not the instance of needed classes")
         self._accounts.append(account)
 
     def close_account(self, account_number: int):
