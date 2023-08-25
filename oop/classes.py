@@ -4,14 +4,14 @@ class Country:
         self.population = population
 
     def add_two_countries(self, other):
-        if type(other) != Country:
+        if not isinstance(other, Country):
             return TypeError(f'{other} must be a Country instance')
         name = f'{self.name} {other.name}'
         population = self.population + other.population
         return Country(name, population)
 
     def __add__(self, other):
-        if type(other) != Country:
+        if not isinstance(other, Country):
             return TypeError(f'{other} must be a Country instance')
         name = f'{self.name} {other.name}'
         population = self.population + other.population
