@@ -1,14 +1,10 @@
 import string
 from random import randint
 
-alphabet = []
-for i in string.ascii_uppercase:
-    alphabet.append(i)
-
 
 def generate_files():
     data = []
-    for ch in alphabet:
+    for ch in list(string.ascii_uppercase):
         with open(f'./files/{ch}.txt', 'w+') as file:
             file.write(f'{randint(1, 100)}')
             file.seek(0)
